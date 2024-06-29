@@ -48,7 +48,7 @@ class Worker1(QThread):
         self.currentFrame = None
         self.ThreadActive = True
         picam2 = Picamera2()
-        picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (640, 480)}))
+        picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (320, 240)}))
         picam2.start()
         while self.ThreadActive:
             frame = picam2.capture_array()

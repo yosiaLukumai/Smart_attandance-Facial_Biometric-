@@ -1,6 +1,6 @@
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 import cv2, imutils
 import numpy as np
 import atexit
@@ -42,7 +42,7 @@ class MyDialog(QDialog):
 
 
 class Worker1(QThread):
-    ImageUpdate = Signal(QImage)
+    ImageUpdate = pyqtSignal(QImage)
     def run(self):
         self.currentFrame = None
         self.ThreadActive = True

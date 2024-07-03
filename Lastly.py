@@ -53,7 +53,9 @@ def find_name_by_id(filename, id_to_find):
     data_dict, _ = read_csv_to_dict(filename)
     return data_dict.get(id_to_find, "ID not found")
 
-
+def is_name_taken(filename, name_to_check):
+    data_dict, _ = read_csv_to_dict(filename)
+    return name_to_check in data_dict.values()
 
 dataset_path = "datasets/"
 with open('encodings.pkl', 'rb') as f:
@@ -116,14 +118,27 @@ class Worker1(QThread):
 
 
 class WorkerFingerRegister():
-    RegistrationResults = pyqtSignal(str)
+    RegistrationResults = pyqtSignal(bool)
+    ProcessInfo = pyqtSignal(str)
     def run(self):
         self.ThreadActive = False
         try:
             uart = serial.Serial("/dev/ttyS0", baudrate=57600, timeout=1)
             self.finger = adafruit_fingerprint.Adafruit_Fingerprint(uart)
+
+            # let try to get the index of the finger_print
+            _, last_id = int(read_csv_to_dict(filename)) + 1
+            flag = self.enroll_finger(last_id)
+            if flag:
+                print("************************* All went welll **************")
+                self.ProcessInfo.emit(" Well set OK..")
+                self.RegistrationResults.emit(True)
+            else:
+                self.ProcessInfo.emit(f"Error:  Failed retry")
+                self.RegistrationResults.emit(False)
         except Exception as e:
-            print(e)
+            self.ProcessInfo.emit(f"Error: {str(e)}")
+            self.RegistrationResults.emit(False)
     
 
     def stop(self):
@@ -134,40 +149,49 @@ class WorkerFingerRegister():
         """Take a 2 finger images and template it, then store in 'location'"""
         for fingerimg in range(1, 3):
             if fingerimg == 1:
+                self.ProcessInfo.emit("Place finger on sensor...")
                 print("Place finger on sensor...", end="")
             else:
+                self.ProcessInfo.emit("Place same finger again...")
                 print("Place same finger again...", end="")
 
             while True:
                 i = self.finger.get_image()
                 if i == adafruit_fingerprint.OK:
                     print("Image taken")
+                    self.ProcessInfo.emit("Image Taken")
                     break
                 if i == adafruit_fingerprint.NOFINGER:
                     print(".", end="")
                 elif i == adafruit_fingerprint.IMAGEFAIL:
+                    self.ProcessInfo.emit("Error:  Imaging error (Re-try..)")
                     print("Imaging error")
                     return False
                 else:
                     print("Other error")
                     return False
-
             print("Templating...", end="")
             i = self.finger.image_2_tz(fingerimg)
             if i == adafruit_fingerprint.OK:
                 print("Templated")
             else:
+
                 if i == adafruit_fingerprint.IMAGEMESS:
+                    self.ProcessInfo.emit("Error:  Image too messy (Re-try..)")
                     print("Image too messy")
                 elif i == adafruit_fingerprint.FEATUREFAIL:
+                    self.ProcessInfo.emit("Error: Could not identify features (Re-try..)")
                     print("Could not identify features")
                 elif i == adafruit_fingerprint.INVALIDIMAGE:
                     print("Image invalid")
+                    self.ProcessInfo.emit("Error: Image invalid (Re-try..)")
                 else:
+                    self.ProcessInfo.emit("Error: Unknown (Re-try..)")
                     print("Other error")
                 return False
 
             if fingerimg == 1:
+                self.ProcessInfo.emit("Remove finger")
                 print("Remove finger")
                 time.sleep(1)
                 while i != adafruit_fingerprint.NOFINGER:
@@ -179,8 +203,10 @@ class WorkerFingerRegister():
             print("Created")
         else:
             if i == adafruit_fingerprint.ENROLLMISMATCH:
+                self.ProcessInfo.emit("Error: Prints did not match (Re-try..)")
                 print("Prints did not match")
             else:
+                self.ProcessInfo.emit("Error: Unknown (Re-try..)")
                 print("Other error")
             return False
 
@@ -196,7 +222,7 @@ class WorkerFingerRegister():
             else:
                 print("Other error")
             return False
-
+        
         return True
 
 
@@ -427,7 +453,7 @@ class Ui_MainWindow(object):
         results = Result.split("-")
         if(results[0] == '1'):
             print("Id found:  "+ str(results[1]))
-            name = find_name_by_id(results[1])
+            name = find_name_by_id(filename, results[1])
             self.FingerResultsDialog.setTextResult(f"Name: {name}")
 
         else:
@@ -600,6 +626,18 @@ class Ui_RegisterWindow(object):
 
         self.horizontalLayout_2.addWidget(self.label_3)
 
+
+        self.label_4 = QLabel(self.centralwidget)
+        self.label_4.setObjectName(u"label_4")
+        self.label_4.setGeometry(QRect(50, 240, 501, 41))
+        font3 = QFont()
+        font3.setFamily(u"Sitka Subheading")
+        font3.setPointSize(16)
+        font3.setBold(False)
+        font3.setItalic(False)
+        font3.setWeight(50)
+        self.label_4.setFont(font3)
+
         # RegisterWindow.setCentralWidget(self.centralwidget)
         # self.statusbar = QStatusBar(RegisterWindow)
         # self.statusbar.setObjectName(u"statusbar")
@@ -613,6 +651,10 @@ class Ui_RegisterWindow(object):
         self.retranslateUi(RegisterWindow)
 
         self.pushButton.clicked.connect(self.submitRegistration)
+        self.pushButton_2.clicked.connect(self.triggerBiometricRegistration)
+        self.RegisterWorker = WorkerFingerRegister()
+        self.RegisterWorker.RegistrationResults.connect(self.RegMainRes)
+        self.RegisterWorker.ProcessInfo.connect(self.MainProcessRes)
 
         QMetaObject.connectSlotsByName(RegisterWindow)
     # setupUi
@@ -624,10 +666,26 @@ class Ui_RegisterWindow(object):
         self.label_2.setText(QCoreApplication.translate("RegisterWindow", u"FINGERPRINT CONFIG", None))
         self.pushButton_2.setText(QCoreApplication.translate("RegisterWindow", u"CONNECT", None))
         self.label_3.setText(QCoreApplication.translate("RegisterWindow", u".", None))
+        self.label_4.setText("")
+
+    def RegMainRes(self, flag:bool):
+        if flag:
+            self.BiometricSuccesful = True
+        else:
+            self.BiometricSuccesful = False
+
+    def MainProcessRes(self, msg):
+        self.label_4.setText(msg)
 
     def submitRegistration(self):
         if(self.lineEdit.text() != "" and self.BiometricSuccesful):
             print("We can close this sheet right now")
+            _, last_id = str(int(read_csv_to_dict(filename)) + 1)
+            update_or_add_entry(filename, last_id, self.lineEdit.text())
+            self.dialogResult.setTextResult("Successful registered Biometrics")
+            self.dialogResult.center(mainWindow)
+            self.dialogResult.exec_()
+
         else:
             if(self.lineEdit.text() == ""):
                 self.dialogResult.setTextResult("Error:  Fill first name")
@@ -635,6 +693,18 @@ class Ui_RegisterWindow(object):
                 self.dialogResult.setTextResult("Error: Register the Fingerprint First")
             self.dialogResult.center(mainWindow)
             self.dialogResult.exec_()
+        
+    def triggerBiometricRegistration(self):
+        if(self.lineEdit.text() != ""):
+            print(" Checking availabilty of the name")
+            if not is_name_taken(filename, self.lineEdit.text()):
+                print(" Let's try registering")
+                self.RegisterWorker.start()
+            else:
+                print("  == NAME TAKEN === ")
+                self.dialogResult.setTextResult("Error:   == NAME TAKEN === ")
+                self.dialogResult.center(mainWindow)
+                self.dialogResult.exec_()
 
 
       

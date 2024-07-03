@@ -1,7 +1,7 @@
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
-import cv2, imutils
+import cv2
 import numpy as np
 from picamera2 import Picamera2
 import atexit
@@ -39,7 +39,7 @@ class MyDialog(QDialog):
         self.setGeometry(self_geometry)
     
     def setTextResult(self, name):
-        self.label.setText(f"Name: {name}")
+        self.label.setText(f"{name}")
 
 
 class Worker1(QThread):
@@ -259,9 +259,9 @@ class Ui_MainWindow(object):
     
     def passImage(self):
         unknown_image = np.array(self.Worker1.currentFrame).astype("uint8")
-        unknown_image = cv2.cvtColor(unknown_image, cv2.COLOR_RGB2BGR)
         face_locations = face_recognition.face_locations(unknown_image)
         face_encodings = face_recognition.face_encodings(unknown_image, face_locations)
+        unknown_image = cv2.cvtColor(unknown_image, cv2.COLOR_RGB2BGR)
 
         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
             matches = face_recognition.compare_faces(known_encodings, face_encoding)
@@ -278,7 +278,7 @@ class Ui_MainWindow(object):
                 if self.Worker1.currentFrame is None:
                     self.dialogResult.setTextResult("Re-try failed to fetch")
                 else:
-                    self.dialogResult.setTextResult(name)
+                    self.dialogResult.setTextResult("Name: " + name)
             except Exception as e:
                 print("Error in setting the result")
                 print(e)
@@ -290,22 +290,21 @@ class Ui_MainWindow(object):
             # cv2.putText(unknown_image, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
             # cv2.imshow("Image", unknown_image)
         if self.FacialRecognized == False:
-            self.dialogResult.setTextResult("Unknown")
+            self.dialogResult.setTextResult("Name: " +"Unknown")
         
         self.FacialRecognized = False
-
 
 class Ui_RegisterWindow(object):
     def setupUi(self, RegisterWindow):
         if not RegisterWindow.objectName():
-            RegisterWindow.setObjectName(u"Add Entry")
+            RegisterWindow.setObjectName(u"RegisterWindow")
         RegisterWindow.resize(640, 480)
         RegisterWindow.setCursor(QCursor(Qt.PointingHandCursor))
         self.centralwidget = QWidget(RegisterWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.verticalLayoutWidget_2 = QWidget(self.centralwidget)
         self.verticalLayoutWidget_2.setObjectName(u"verticalLayoutWidget_2")
-        self.verticalLayoutWidget_2.setGeometry(QRect(70, 350, 481, 51))
+        self.verticalLayoutWidget_2.setGeometry(QRect(70, 340, 481, 51))
         self.verticalLayout_2 = QVBoxLayout(self.verticalLayoutWidget_2)
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
         self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
@@ -321,7 +320,6 @@ class Ui_RegisterWindow(object):
         font.setWeight(75)
         self.pushButton.setFont(font)
         self.pushButton.setStyleSheet(u"color:#fff;\n""background-color:rgb(85, 0, 255);\n""border-radius:18;")
-
         self.verticalLayout_2.addWidget(self.pushButton)
 
         self.horizontalLayoutWidget = QWidget(self.centralwidget)
@@ -383,56 +381,51 @@ class Ui_RegisterWindow(object):
 
         self.horizontalLayout_2.addWidget(self.label_3)
 
-        self.label_4 = QLabel(self.centralwidget)
-        self.label_4.setObjectName(u"label_4")
-        self.label_4.setGeometry(QRect(50, 240, 231, 31))
-        self.label_4.setFont(font)
-        self.label_4.setStyleSheet(u"color:rgb(85, 0, 255);")
-        self.horizontalLayoutWidget_3 = QWidget(self.centralwidget)
-        self.horizontalLayoutWidget_3.setObjectName(u"horizontalLayoutWidget_3")
-        self.horizontalLayoutWidget_3.setGeometry(QRect(50, 270, 541, 42))
-        self.horizontalLayout_3 = QHBoxLayout(self.horizontalLayoutWidget_3)
-        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
-        self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
-        self.pushButton_3 = QPushButton(self.horizontalLayoutWidget_3)
-        self.pushButton_3.setObjectName(u"pushButton_3")
-        self.pushButton_3.setMinimumSize(QSize(0, 40))
-        self.pushButton_3.setFont(font)
-        self.pushButton_3.setCursor(QCursor(Qt.OpenHandCursor))
-        self.pushButton_3.setStyleSheet(u"color:rgb(0, 170, 255)")
-
-        self.horizontalLayout_3.addWidget(self.pushButton_3)
-
-        self.label_5 = QLabel(self.horizontalLayoutWidget_3)
-        self.label_5.setObjectName(u"label_5")
-        self.label_5.setMaximumSize(QSize(16777215, 40))
-        self.label_5.setFont(font2)
-        self.label_5.setStyleSheet(u"color:rgb(255, 0, 255)")
-
-        self.horizontalLayout_3.addWidget(self.label_5)
-        # self.layout = QVBoxLayout()
-        # self.layout.addWidget(self.centralwidget)
         # RegisterWindow.setCentralWidget(self.centralwidget)
         # self.statusbar = QStatusBar(RegisterWindow)
         # self.statusbar.setObjectName(u"statusbar")
         # RegisterWindow.setStatusBar(self.statusbar)
 
+
+        # code handling
+        self.BiometricSuccesful = False
+        self.dialogResult = MyDialog()
+
         self.retranslateUi(RegisterWindow)
 
+        self.pushButton.clicked.connect(self.submitRegistration)
+
         QMetaObject.connectSlotsByName(RegisterWindow)
-        
     # setupUi
 
     def retranslateUi(self, RegisterWindow):
-        RegisterWindow.setWindowTitle(QCoreApplication.translate("RegisterWindow", u"MainWindow", None))
+        RegisterWindow.setWindowTitle(QCoreApplication.translate("RegisterWindow", u"   RegisterWindow", None))
         self.pushButton.setText(QCoreApplication.translate("RegisterWindow", u"SUBMIT", None))
         self.label.setText(QCoreApplication.translate("RegisterWindow", u"ENTER NAME", None))
         self.label_2.setText(QCoreApplication.translate("RegisterWindow", u"FINGERPRINT CONFIG", None))
         self.pushButton_2.setText(QCoreApplication.translate("RegisterWindow", u"CONNECT", None))
         self.label_3.setText(QCoreApplication.translate("RegisterWindow", u".", None))
-        self.label_4.setText(QCoreApplication.translate("RegisterWindow", u"FACIAL REGISTRY", None))
-        self.pushButton_3.setText(QCoreApplication.translate("RegisterWindow", u"CAPTURE", None))
-        self.label_5.setText(QCoreApplication.translate("RegisterWindow", u".", None))
+
+    def submitRegistration(self):
+        if(self.lineEdit.text() != "" and self.BiometricSuccesful):
+            print("We can close this sheet right now")
+        else:
+            if(self.lineEdit.text() == ""):
+                self.dialogResult.setTextResult("Error:  Fill first name")
+            else:
+                self.dialogResult.setTextResult("Error: Register the Fingerprint First")
+            self.dialogResult.center(mainWindow)
+            self.dialogResult.exec_()
+
+    
+    # def FireAlert(self, message):
+
+
+    
+
+    # retranslateUi
+
+
 
    
 

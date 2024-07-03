@@ -2,11 +2,17 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 import cv2
+import hashlib
+from pyfingerprint.pyfingerprint import PyFingerprint
+from pyfingerprint.pyfingerprint import FINGERPRINT_CHARBUFFER1
 import numpy as np
 from picamera2 import Picamera2
 import atexit
 import face_recognition
 import pickle
+
+
+
 
 dataset_path = "datasets/"
 with open('encodings.pkl', 'rb') as f:
@@ -65,6 +71,61 @@ class Worker1(QThread):
     
     def currentFrame(self):
         return self.currentFrame
+
+
+
+class Worker2(QThread):
+    FingerPrintUpdate = pyqtSignal(QImage)
+    def run(self):
+        self.ThreadActive = True
+        try:
+            f = PyFingerprint('/dev/ttyS0', 57600, 0xFFFFFFFF, 0x00000000)
+
+            if ( f.verifyPassword() == False ):
+                   self.FingerPrintUpdate.emit("0-Failed to Initialize")
+                # raise ValueError('The given fingerprint sensor password is wrong!')
+            
+        except Exception as e:
+            print('The fingerprint sensor could not be initialized!')
+            print('Exception message: ' + str(e))
+            self.FingerPrintUpdate.emit("0-Failed to Initialize")
+        ## Gets some sensor information
+
+        try:
+            print('Waiting for finger...')
+            ## Wait that finger is read
+            while ( f.readImage() == False ):
+                pass
+
+            f.convertImage(FINGERPRINT_CHARBUFFER1)
+
+            result = f.searchTemplate()
+
+            positionNumber = result[0]
+            accuracyScore = result[1]
+
+            if ( positionNumber == -1 ):
+                print('No match found!')
+                # exit(0)
+                self.FingerPrintUpdate.emit("0-None")  
+
+            else:
+                print('Found template at position #' +  str(positionNumber))
+                print('The accuracy score is: ' + str(accuracyScore))
+                self.FingerPrintUpdate.emit("1-"+  str(positionNumber))
+
+
+
+        except Exception as e:
+            print('Operation failed!')
+            print('Exception message: ' + str(e))
+            self.FingerPrintUpdate.emit("0-Something Went Wrong" + str(e))  
+                
+    def stop(self):
+        self.ThreadActive = False
+        self.quit()
+    
+    
 
 
 class Ui_MainWindow(object):
@@ -200,11 +261,15 @@ class Ui_MainWindow(object):
         #modes for the 
         self.FacialMode = False
         self.Worker1 = Worker1()
+        self.Worker2 = Worker2()
         self.dialogResult = MyDialog()
         self.Worker1.ImageUpdate.connect(self.ImageUpdateSlot)
+        self.Worker2.FingerPrintUpdate.connect(self.FingerPrintResultSlot)
         self.CaptureButton.clicked.connect(self.showDialog)
         self.FacialRecognized = False
         self.pushButton_3.clicked.connect(self.showRegisterDialog)
+        self.FingerPrintSensor.clicked.connect(self.StartFingerprintScanning)
+
         
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
@@ -231,6 +296,21 @@ class Ui_MainWindow(object):
     
     def ImageUpdateSlot(self, Image):
         self.label.setPixmap(QPixmap.fromImage(Image))
+
+    def FingerPrintResultSlot(self, Result:str):
+        results = Result.split("-")
+        if(bool(results[0])):
+            print("Id found:  "+ str(results[1]))
+        else:
+            if results[1] == "None":
+                print("No match found")
+            else:
+                print("Other result: ", results[1])
+        self.Worker2.stop()
+    
+    def StartFingerprintScanning(self):
+        self.Worker2.start()
+
 
  
     def CancelFeed(self):
@@ -259,9 +339,9 @@ class Ui_MainWindow(object):
     
     def passImage(self):
         unknown_image = np.array(self.Worker1.currentFrame).astype("uint8")
+        unknown_image = cv2.cvtColor(unknown_image, cv2.COLOR_RGB2BGR)
         face_locations = face_recognition.face_locations(unknown_image)
         face_encodings = face_recognition.face_encodings(unknown_image, face_locations)
-        unknown_image = cv2.cvtColor(unknown_image, cv2.COLOR_RGB2BGR)
 
         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
             matches = face_recognition.compare_faces(known_encodings, face_encoding)
@@ -417,24 +497,7 @@ class Ui_RegisterWindow(object):
             self.dialogResult.center(mainWindow)
             self.dialogResult.exec_()
 
-    
-    # def FireAlert(self, message):
 
-
-    
-
-    # retranslateUi
-
-
-
-   
-
-
-# class RegisterWindow(QDialog):
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.ui = Ui_RegisterWindow()
-#         self.ui.setupUi(parent)
       
 class RegisterWindow(QDialog):
     def __init__(self, parent=None):

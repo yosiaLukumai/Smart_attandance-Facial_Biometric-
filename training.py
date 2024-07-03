@@ -3,7 +3,10 @@ import os
 import pickle
 import cv2
 import os
+from picamera2 import Picamera2
 
+picam2 = Picamera2()
+picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (320, 240)}))
 name = 'Alesha'
 SessionImageEnded = False
 OutputDir = "datasets"+"/"+ name
@@ -56,14 +59,12 @@ def TakePics():
     global img_counter
 
     global SessionImageEnded
+    picam2.start()
     print("Local ", img_counter, SessionImageEnded)
     while True:
-        ret, frame = cam.read()
-        if not ret:
-            print("Error:  failed to grab frame")
-            SessionImageEnded = True
-            break
-        cv2.imshow("press space to take a photo", frame)
+        frame = picam2.capture_array()
+        Image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        cv2.imshow("press space to take a photo", Image)
 
         k = cv2.waitKey(1)
         if k%256 == 27 or k == ord('q'):
@@ -102,8 +103,8 @@ def PerfomJucntions():
 if __name__ == "__main__":
     try:
         TakePics()
-        cam.release()
-        cv2.destroyAllWindows()
+        # cam.release()
+        # cv2.destroyAllWindows()
         PerfomJucntions()
     except Exception as e:
         print("Error: ", e)

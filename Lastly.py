@@ -117,17 +117,18 @@ class Worker1(QThread):
     
 
 
-class WorkerFingerRegister():
+class WorkerFingerRegister(QThread):
     RegistrationResults = pyqtSignal(bool)
     ProcessInfo = pyqtSignal(str)
     def run(self):
-        self.ThreadActive = False
+        self.ThreadActive = True
         try:
             uart = serial.Serial("/dev/ttyS0", baudrate=57600, timeout=1)
             self.finger = adafruit_fingerprint.Adafruit_Fingerprint(uart)
 
             # let try to get the index of the finger_print
-            _, last_id = int(read_csv_to_dict(filename)) + 1
+            _, last_id = read_csv_to_dict(filename) + 1
+            last_id = int(last_id) + 1
             flag = self.enroll_finger(last_id)
             if flag:
                 print("************************* All went welll **************")
@@ -228,6 +229,7 @@ class WorkerFingerRegister():
 
 class Worker2(QThread):
     FingerPrintUpdate = pyqtSignal(str)
+    ProcessCont = pyqtSignal(str)
     def run(self):
         self.ThreadActive = True
         try:
@@ -236,7 +238,7 @@ class Worker2(QThread):
             if ( f.verifyPassword() == False ):
                    self.FingerPrintUpdate.emit("0-Failed to Initialize")
                 # raise ValueError('The given fingerprint sensor password is wrong!')
-            
+            self.ProcessCont.emit("===CONNECTED====")
         except Exception as e:
             print('The fingerprint sensor could not be initialized!')
             print('Exception message: ' + str(e))
@@ -245,6 +247,7 @@ class Worker2(QThread):
 
         try:
             print('Waiting for finger...')
+            self.ProcessCont.emit("Waiting for finger...")
             ## Wait that finger is read
             while ( f.readImage() == False ) and self.ThreadActive:
                 pass
@@ -383,6 +386,16 @@ class Ui_MainWindow(object):
         self.label.setMinimumSize(QSize(320, 240))
 
         self.FacialOptionBox.addWidget(self.label, 0, 0, 1, 1)
+        self.label_2 = QLabel(self.centralwidget)
+        self.label_2.setObjectName(u"label_2")
+        self.label_2.setGeometry(QRect(200, 170, 251, 71))
+        font4 = QFont()
+        font4.setFamily(u"Segoe UI")
+        font4.setPointSize(12)
+        font4.setBold(True)
+        font4.setItalic(True)
+        font4.setWeight(75)
+        self.label_2.setFont(font4)
 
         self.CaptureButton = QPushButton(self.gridLayoutWidget)
         self.CaptureButton.setObjectName(u"CaptureButton")
@@ -416,6 +429,7 @@ class Ui_MainWindow(object):
         self.dialogResult = MyDialog()
         self.FingerResultsDialog = MyDialog()
         self.Worker1.ImageUpdate.connect(self.ImageUpdateSlot)
+        self.Worker2.ProcessCont.connect(self.processOngoing)
         self.Worker2.FingerPrintUpdate.connect(self.FingerPrintResultSlot)
         self.CaptureButton.clicked.connect(self.showDialog)
         self.FacialRecognized = False
@@ -431,12 +445,17 @@ class Ui_MainWindow(object):
         self.fingerPrintSensor.setText(QCoreApplication.translate("MainWindow", u"CONNECT TO FINGERPRINT", None))
         self.FingerPrintSensor.setText(QCoreApplication.translate("MainWindow", u"CONNECT", None))
         self.label.setText("")
+        self.label_2.setText("")
         self.CaptureButton.setText(QCoreApplication.translate("MainWindow", u"CAPTURE", None))
     # retranslateUi
 
     def cleanupResources(self):
         print("cleaning up resources....")
         self.Worker1.stop()
+        self.Worker2.stop()
+
+    def processOngoing(self, msg):
+        self.label_2.setText(msg)
 
     def showFacialBox(self):
         self.gridLayoutWidget.show()
@@ -680,7 +699,8 @@ class Ui_RegisterWindow(object):
     def submitRegistration(self):
         if(self.lineEdit.text() != "" and self.BiometricSuccesful):
             print("We can close this sheet right now")
-            _, last_id = str(int(read_csv_to_dict(filename)) + 1)
+            _, last_id = read_csv_to_dict(filename)
+            last_id = str(int(last_id) + 1)
             update_or_add_entry(filename, last_id, self.lineEdit.text())
             self.dialogResult.setTextResult("Successful registered Biometrics")
             self.dialogResult.center(mainWindow)
@@ -705,6 +725,11 @@ class Ui_RegisterWindow(object):
                 self.dialogResult.setTextResult("Error:   == NAME TAKEN === ")
                 self.dialogResult.center(mainWindow)
                 self.dialogResult.exec_()
+        else:
+            self.dialogResult.setTextResult("Error:   == FILL FIRST NAME === ")
+            self.dialogResult.center(mainWindow)
+            self.dialogResult.exec_()
+
 
 
       

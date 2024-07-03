@@ -10,7 +10,48 @@ from picamera2 import Picamera2
 import atexit
 import face_recognition
 import pickle
+import time
+import serial
+import adafruit_fingerprint
+import csv
+filename = "fingerPrints.csv"
 
+
+def read_csv_to_dict(filename):
+    data_dict = {}
+    last_id = 0
+    try:
+        with open(filename, 'r') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data_dict[row['id']] = row['name']
+                last_id = max(last_id, int(row['id']))
+    except FileNotFoundError:
+        pass  # If the file doesn't exist, start with an empty dictionary
+    return data_dict, last_id
+
+def write_dict_to_csv(filename, data_dict):
+    with open(filename, 'w', newline='') as file:
+        fieldnames = ['id', 'name']
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for id, name in data_dict.items():
+            writer.writerow({'id': id, 'name': name})
+
+def update_or_add_entry(filename, id_to_update, new_name):
+    data_dict, last_id = read_csv_to_dict(filename)
+    
+    if id_to_update in data_dict:
+        data_dict[id_to_update] = new_name  # Update existing entry
+    else:
+        new_id = str(last_id + 1)
+        data_dict[new_id] = new_name  # Add new entry
+    
+    write_dict_to_csv(filename, data_dict)
+
+def find_name_by_id(filename, id_to_find):
+    data_dict, _ = read_csv_to_dict(filename)
+    return data_dict.get(id_to_find, "ID not found")
 
 
 
@@ -71,7 +112,92 @@ class Worker1(QThread):
     
     def currentFrame(self):
         return self.currentFrame
+    
 
+
+class WorkerFingerRegister():
+    RegistrationResults = pyqtSignal(str)
+    def run(self):
+        self.ThreadActive = False
+        try:
+            uart = serial.Serial("/dev/ttyS0", baudrate=57600, timeout=1)
+            self.finger = adafruit_fingerprint.Adafruit_Fingerprint(uart)
+        except Exception as e:
+            print(e)
+    
+
+    def stop(self):
+        self.ThreadActive = False
+        self.quit()
+
+    def enroll_finger(self, location):
+        """Take a 2 finger images and template it, then store in 'location'"""
+        for fingerimg in range(1, 3):
+            if fingerimg == 1:
+                print("Place finger on sensor...", end="")
+            else:
+                print("Place same finger again...", end="")
+
+            while True:
+                i = self.finger.get_image()
+                if i == adafruit_fingerprint.OK:
+                    print("Image taken")
+                    break
+                if i == adafruit_fingerprint.NOFINGER:
+                    print(".", end="")
+                elif i == adafruit_fingerprint.IMAGEFAIL:
+                    print("Imaging error")
+                    return False
+                else:
+                    print("Other error")
+                    return False
+
+            print("Templating...", end="")
+            i = self.finger.image_2_tz(fingerimg)
+            if i == adafruit_fingerprint.OK:
+                print("Templated")
+            else:
+                if i == adafruit_fingerprint.IMAGEMESS:
+                    print("Image too messy")
+                elif i == adafruit_fingerprint.FEATUREFAIL:
+                    print("Could not identify features")
+                elif i == adafruit_fingerprint.INVALIDIMAGE:
+                    print("Image invalid")
+                else:
+                    print("Other error")
+                return False
+
+            if fingerimg == 1:
+                print("Remove finger")
+                time.sleep(1)
+                while i != adafruit_fingerprint.NOFINGER:
+                    i = self.finger.get_image()
+
+        print("Creating model...", end="")
+        i = self.finger.create_model()
+        if i == adafruit_fingerprint.OK:
+            print("Created")
+        else:
+            if i == adafruit_fingerprint.ENROLLMISMATCH:
+                print("Prints did not match")
+            else:
+                print("Other error")
+            return False
+
+        print("Storing model #%d..." % location, end="")
+        i = self.finger.store_model(location)
+        if i == adafruit_fingerprint.OK:
+            print("Stored")
+        else:
+            if i == adafruit_fingerprint.BADLOCATION:
+                print("Bad storage location")
+            elif i == adafruit_fingerprint.FLASHERR:
+                print("Flash storage error")
+            else:
+                print("Other error")
+            return False
+
+        return True
 
 
 class Worker2(QThread):
@@ -299,8 +425,10 @@ class Ui_MainWindow(object):
 
     def FingerPrintResultSlot(self, Result:str):
         results = Result.split("-")
-        if(bool(results[0])):
+        if(results[0] == '1'):
             print("Id found:  "+ str(results[1]))
+            name = find_name_by_id(results[1])
+            self.FingerResultsDialog.setTextResult(f"Name: {name}")
 
         else:
             if results[1] == "None":

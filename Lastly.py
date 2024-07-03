@@ -75,7 +75,7 @@ class Worker1(QThread):
 
 
 class Worker2(QThread):
-    FingerPrintUpdate = pyqtSignal(QImage)
+    FingerPrintUpdate = pyqtSignal(str)
     def run(self):
         self.ThreadActive = True
         try:

@@ -94,7 +94,7 @@ class Worker2(QThread):
         try:
             print('Waiting for finger...')
             ## Wait that finger is read
-            while ( f.readImage() == False ):
+            while ( f.readImage() == False ) and self.ThreadActive:
                 pass
 
             f.convertImage(FINGERPRINT_CHARBUFFER1)
@@ -106,7 +106,6 @@ class Worker2(QThread):
 
             if ( positionNumber == -1 ):
                 print('No match found!')
-                # exit(0)
                 self.FingerPrintUpdate.emit("0-None")  
 
             else:
@@ -263,6 +262,7 @@ class Ui_MainWindow(object):
         self.Worker1 = Worker1()
         self.Worker2 = Worker2()
         self.dialogResult = MyDialog()
+        self.FingerResultsDialog = MyDialog()
         self.Worker1.ImageUpdate.connect(self.ImageUpdateSlot)
         self.Worker2.FingerPrintUpdate.connect(self.FingerPrintResultSlot)
         self.CaptureButton.clicked.connect(self.showDialog)
@@ -301,15 +301,22 @@ class Ui_MainWindow(object):
         results = Result.split("-")
         if(bool(results[0])):
             print("Id found:  "+ str(results[1]))
+
         else:
             if results[1] == "None":
                 print("No match found")
+                self.FingerResultsDialog.setTextResult("No match found")
             else:
                 print("Other result: ", results[1])
+                self.FingerResultsDialog.setTextResult(results[1])
         self.Worker2.stop()
+
+        #Bring dialog forth
+        self.showDialogFingerResult()
     
     def StartFingerprintScanning(self):
         self.Worker2.start()
+
 
 
  
@@ -323,7 +330,11 @@ class Ui_MainWindow(object):
         self.gridLayoutWidget.hide()
         self.verticalLayoutWidget.show()
         self.verticalLayoutWidget.setGeometry(QRect(90, 60, 431, 101))
-    
+
+    def showDialogFingerResult(self):
+        self.FingerResultsDialog.center(mainWindow)
+        self.FingerResultsDialog.exec_()
+
     def showDialog(self):
         self.passImage()
         self.dialogResult.center(mainWindow)

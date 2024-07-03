@@ -810,6 +810,7 @@ class Ui_RegisterWindow(object):
         self.TrainButton.setDisabled(False)
         self.CaptureButton.setDisabled(False)
         self.pushButton.setDisabled(False)
+        self.Worker1.start()
 
         
         
@@ -826,8 +827,13 @@ class Ui_RegisterWindow(object):
         else:
             if(self.lineEdit.text() == ""):
                 self.dialogResult.setTextResult("Error:  Fill first name")
+                if not self.TrainingSuccess:
+                    self.dialogResult.setTextResult("Error: Train first the Pics")
+                else:
+                    self.dialogResult.setTextResult("Error: Register the Fingerprint First")
             else:
                 self.dialogResult.setTextResult("Error: Register the Fingerprint First")
+
             self.dialogResult.center(mainWindow)
             self.dialogResult.exec_()
 

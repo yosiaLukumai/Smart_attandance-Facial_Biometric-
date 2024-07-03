@@ -3,6 +3,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 import cv2
 import hashlib
+import os
 from pyfingerprint.pyfingerprint import PyFingerprint
 from pyfingerprint.pyfingerprint import FINGERPRINT_CHARBUFFER1
 import numpy as np
@@ -15,6 +16,11 @@ import serial
 import adafruit_fingerprint
 import csv
 filename = "fingerPrints.csv"
+OutputDir = "datasets/"
+dataset_path = "datasets/"
+
+known_encodings = []
+known_names = []
 
 
 def read_csv_to_dict(filename):
@@ -101,9 +107,10 @@ class Worker1(QThread):
         picam2.start()
         while self.ThreadActive:
             frame = picam2.capture_array()
-            self.currentFrame = frame
+            # self.currentFrame = frame
             if True:
                 Image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                self.currentFrame = Image 
                 FlippedImage = cv2.flip(Image, 1)
                 ConvertToQtFormat = QImage(FlippedImage.data, FlippedImage.shape[1], FlippedImage.shape[0], QImage.Format_RGB888)
                 Pic = ConvertToQtFormat.scaled(320, 240, Qt.KeepAspectRatio)
@@ -562,13 +569,15 @@ class Ui_RegisterWindow(object):
     def setupUi(self, RegisterWindow):
         if not RegisterWindow.objectName():
             RegisterWindow.setObjectName(u"RegisterWindow")
-        RegisterWindow.resize(640, 480)
+        RegisterWindow.resize(700, 650)
+        RegisterWindow.setMinimumSize(QSize(700, 650))
+        RegisterWindow.setMaximumSize(QSize(700, 650))
         RegisterWindow.setCursor(QCursor(Qt.PointingHandCursor))
         self.centralwidget = QWidget(RegisterWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.verticalLayoutWidget_2 = QWidget(self.centralwidget)
         self.verticalLayoutWidget_2.setObjectName(u"verticalLayoutWidget_2")
-        self.verticalLayoutWidget_2.setGeometry(QRect(70, 340, 481, 51))
+        self.verticalLayoutWidget_2.setGeometry(QRect(70, 580, 481, 51))
         self.verticalLayout_2 = QVBoxLayout(self.verticalLayoutWidget_2)
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
         self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
@@ -584,11 +593,12 @@ class Ui_RegisterWindow(object):
         font.setWeight(75)
         self.pushButton.setFont(font)
         self.pushButton.setStyleSheet(u"color:#fff;\n""background-color:rgb(85, 0, 255);\n""border-radius:18;")
+
         self.verticalLayout_2.addWidget(self.pushButton)
 
         self.horizontalLayoutWidget = QWidget(self.centralwidget)
         self.horizontalLayoutWidget.setObjectName(u"horizontalLayoutWidget")
-        self.horizontalLayoutWidget.setGeometry(QRect(50, 70, 541, 41))
+        self.horizontalLayoutWidget.setGeometry(QRect(70, 20, 541, 41))
         self.horizontalLayout = QHBoxLayout(self.horizontalLayoutWidget)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
@@ -614,12 +624,12 @@ class Ui_RegisterWindow(object):
 
         self.label_2 = QLabel(self.centralwidget)
         self.label_2.setObjectName(u"label_2")
-        self.label_2.setGeometry(QRect(50, 140, 231, 31))
+        self.label_2.setGeometry(QRect(70, 70, 231, 31))
         self.label_2.setFont(font)
         self.label_2.setStyleSheet(u"color:rgb(85, 0, 255);")
         self.horizontalLayoutWidget_2 = QWidget(self.centralwidget)
         self.horizontalLayoutWidget_2.setObjectName(u"horizontalLayoutWidget_2")
-        self.horizontalLayoutWidget_2.setGeometry(QRect(50, 170, 541, 42))
+        self.horizontalLayoutWidget_2.setGeometry(QRect(70, 100, 541, 42))
         self.horizontalLayout_2 = QHBoxLayout(self.horizontalLayoutWidget_2)
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
         self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
@@ -645,10 +655,9 @@ class Ui_RegisterWindow(object):
 
         self.horizontalLayout_2.addWidget(self.label_3)
 
-
         self.label_4 = QLabel(self.centralwidget)
         self.label_4.setObjectName(u"label_4")
-        self.label_4.setGeometry(QRect(50, 240, 501, 41))
+        self.label_4.setGeometry(QRect(70, 160, 501, 41))
         font3 = QFont()
         font3.setFamily(u"Sitka Subheading")
         font3.setPointSize(16)
@@ -656,48 +665,156 @@ class Ui_RegisterWindow(object):
         font3.setItalic(False)
         font3.setWeight(50)
         self.label_4.setFont(font3)
+        self.gridLayoutWidget = QWidget(self.centralwidget)
+        self.gridLayoutWidget.setObjectName(u"gridLayoutWidget")
+        self.gridLayoutWidget.setGeometry(QRect(70, 220, 431, 283))
+        self.FacialOptionBox = QGridLayout(self.gridLayoutWidget)
+        self.FacialOptionBox.setObjectName(u"FacialOptionBox")
+        self.FacialOptionBox.setContentsMargins(0, 0, 0, 0)
+        self.label_5 = QLabel(self.gridLayoutWidget)
+        self.label_5.setObjectName(u"label_5")
+        self.label_5.setMinimumSize(QSize(320, 240))
 
-        # RegisterWindow.setCentralWidget(self.centralwidget)
-        # self.statusbar = QStatusBar(RegisterWindow)
-        # self.statusbar.setObjectName(u"statusbar")
-        # RegisterWindow.setStatusBar(self.statusbar)
+        self.FacialOptionBox.addWidget(self.label_5, 0, 0, 1, 1)
 
+        self.CaptureButton = QPushButton(self.gridLayoutWidget)
+        self.CaptureButton.setObjectName(u"CaptureButton")
+        self.CaptureButton.setMaximumSize(QSize(120, 40))
+        font4 = QFont()
+        font4.setFamily(u"Segoe Script")
+        font4.setPointSize(12)
+        font4.setBold(True)
+        font4.setWeight(75)
+        self.CaptureButton.setFont(font4)
+        self.CaptureButton.setCursor(QCursor(Qt.PointingHandCursor))
+        self.CaptureButton.setStyleSheet(u"color:rgb(255, 0, 127);")
 
-        # code handling
+        self.FacialOptionBox.addWidget(self.CaptureButton, 1, 0, 1, 1)
+
+        self.TrainButton = QPushButton(self.centralwidget)
+        self.TrainButton.setObjectName(u"TrainButton")
+        self.TrainButton.setGeometry(QRect(70, 520, 200, 40))
+        self.TrainButton.setMinimumSize(QSize(200, 0))
+        self.TrainButton.setMaximumSize(QSize(200, 40))
+        self.TrainButton.setFont(font4)
+        self.TrainButton.setCursor(QCursor(Qt.PointingHandCursor))
+        self.TrainButton.setStyleSheet(u"color:rgb(235, 0, 227);")
         self.BiometricSuccesful = False
         self.dialogResult = MyDialog()
 
         self.retranslateUi(RegisterWindow)
+        
 
+        self.Worker1 = Worker1()
         self.pushButton.clicked.connect(self.submitRegistration)
+        self.Worker1.ImageUpdate.connect(self.ImageUpdateSlot)
+        self.img_counter = 0
+        
+        self.Name_Now = ""
         self.pushButton_2.clicked.connect(self.triggerBiometricRegistration)
         self.RegisterWorker = WorkerFingerRegister()
         self.RegisterWorker.RegistrationResults.connect(self.RegMainRes)
         self.RegisterWorker.ProcessInfo.connect(self.MainProcessRes)
+        self.CaptureButton.clicked.connect(self.CapturePics)
+        self.TrainButton.clicked.connect(self.TrainPics)
+        self.TrainingSuccess = False
 
         QMetaObject.connectSlotsByName(RegisterWindow)
     # setupUi
 
     def retranslateUi(self, RegisterWindow):
-        RegisterWindow.setWindowTitle(QCoreApplication.translate("RegisterWindow", u"   RegisterWindow", None))
+        RegisterWindow.setWindowTitle(QCoreApplication.translate("RegisterWindow", u"MainWindow", None))
         self.pushButton.setText(QCoreApplication.translate("RegisterWindow", u"SUBMIT", None))
         self.label.setText(QCoreApplication.translate("RegisterWindow", u"ENTER NAME", None))
         self.label_2.setText(QCoreApplication.translate("RegisterWindow", u"FINGERPRINT CONFIG", None))
         self.pushButton_2.setText(QCoreApplication.translate("RegisterWindow", u"CONNECT", None))
         self.label_3.setText(QCoreApplication.translate("RegisterWindow", u".", None))
         self.label_4.setText("")
+        self.label_5.setText("")
+        self.CaptureButton.setText(QCoreApplication.translate("RegisterWindow", u"CAPTURE", None))
+        self.TrainButton.setText(QCoreApplication.translate("RegisterWindow", u"TRAIN", None))
 
     def RegMainRes(self, flag:bool):
         if flag:
             self.BiometricSuccesful = True
+            # disable
+            self.pushButton_2.setDisabled(True)
+
         else:
             self.BiometricSuccesful = False
 
+    def ImageUpdateSlot(self, Image):
+        self.label_5.setPixmap(QPixmap.fromImage(Image))
+
+    def EncodingNamesDirs(self):
+        for person_name in os.listdir(dataset_path):
+            person_folder = os.path.join(dataset_path, person_name)
+
+            if not os.path.isdir(person_folder):
+                continue
+
+            for image_name in os.listdir(person_folder):
+                image_path = os.path.join(person_folder, image_name)
+
+                image = face_recognition.load_image_file(image_path)
+
+                encodings = face_recognition.face_encodings(image)
+
+                for encoding in encodings:
+                    known_encodings.append(encoding)
+                    known_names.append(person_name)
+
+        try:
+            with open('encodings.pkl', 'wb') as f:
+                pickle.dump((known_encodings, known_names), f)
+                return True
+        except Exception as e:
+            print("=>  Failed to save training into picke file")
+            return False
+
     def MainProcessRes(self, msg):
         self.label_4.setText(msg)
+    
+    def CapturePics(self):
+        self.CaptureButton.setDisabled(True)
+        # Saving the image
+        workingFrame = self.Worker1.currentFrame 
+        OutputDir = OutputDir + self.lineEdit.text()
+        if not os.path.exists(OutputDir):
+            os.makedirs(OutputDir)
+        fullPath = os.path.join(OutputDir, self.lineEdit.text()+str(self.img_counter)+".jpg")
+        try:
+            written = cv2.imwrite(fullPath, workingFrame)
+        except Exception as e:
+                print("Error: ", e)
+        
+        self.CaptureButton.setDisabled(False)
+        self.img_counter = self.img_counter + 1
+    
+    def TrainPics(self):
+        self.TrainingSuccess = False
+        self.Worker1.stop()
+        self.TrainButton.setDisabled(True)
+        self.CaptureButton.setDisabled(True)
+        self.pushButton.setDisabled(True)
+        if self.img_counter <= 10:
+            # alert more images are needed to perform well training
+            self.dialogResult.setTextResult("Error:   == TAKE_MORE PICTURE === ")
+            self.dialogResult.center(mainWindow)
+            self.dialogResult.exec_()
+        else:
+            print(" Trainig started...................")
+            self.EncodingNamesDirs()
+            self.TrainingSuccess = True
+        
+        self.TrainButton.setDisabled(False)
+        self.CaptureButton.setDisabled(False)
+        self.pushButton.setDisabled(False)
 
+        
+        
     def submitRegistration(self):
-        if(self.lineEdit.text() != "" and self.BiometricSuccesful):
+        if(self.lineEdit.text() != "" and self.BiometricSuccesful and self.TrainingSuccess):
             print("We can close this sheet right now")
             _, last_id = read_csv_to_dict(filename)
             last_id = str(int(last_id) + 1)
@@ -713,6 +830,11 @@ class Ui_RegisterWindow(object):
                 self.dialogResult.setTextResult("Error: Register the Fingerprint First")
             self.dialogResult.center(mainWindow)
             self.dialogResult.exec_()
+
+
+    def closeEvent(self, event):
+        self.Worker1.stop()
+        event.accept()
         
     def triggerBiometricRegistration(self):
         if(self.lineEdit.text() != ""):
